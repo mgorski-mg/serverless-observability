@@ -1,0 +1,237 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  AddItemLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ServerlessObservability::ServerlessObservability.Functions.AddItemLambda::InvokeAsync
+      CodeUri: bin/Release/netcoreapp3.1/publish
+      Role: !GetAtt AddItemLambdaRole.Arn
+
+  NotifyLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ServerlessObservability::ServerlessObservability.Functions.NotifyLambda::InvokeAsync
+      CodeUri: bin/Release/netcoreapp3.1/publish
+      Role: !GetAtt NotifyLambdaRole.Arn
+
+  UpdateItemLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ServerlessObservability::ServerlessObservability.Functions.UpdateItemLambda::InvokeAsync
+      CodeUri: bin/Release/netcoreapp3.1/publish
+      Role: !GetAtt UpdateItemLambdaRole.Arn
+      Events:
+        SqsEvent:
+          Type: SQS
+          Properties:
+            BatchSize: 1
+            Queue: !GetAtt ItemsQueue.Arn
+      Environment:
+        Variables:
+          NotifyLambdaName: !Ref NotifyLambda
+
+  AddItemLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: allowToUseSqs
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:SendMessageBatch
+                Resource: !GetAtt ItemsQueue.Arn
+        - PolicyName: allowToUseParameterStore
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParametersByPath
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+
+  NotifyLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: allowToUseParameterStore
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParametersByPath
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+
+  UpdateItemLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: allowToUseSqs
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:SendMessage
+                  - sqs:SendMessageBatch
+                Resource: !GetAtt ItemsQueue.Arn
+        - PolicyName: allowToUseParameterStore
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParametersByPath
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}
+        - PolicyName: allowToCallLambda
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt NotifyLambda.Arn
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+
+  GetObjectsFromStackBucketPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-get-objects-from-stack-bucket-policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource: !GetAtt StackBucket.Arn
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource: !Sub ${StackBucket.Arn}/*
+      Roles:
+        - Ref: UpdateItemLambdaRole
+
+  PutObjectsToStackBucketPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-put-objects-to-stack-bucket-policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource: !GetAtt StackBucket.Arn
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:PutObjectTagging
+            Resource: !Sub ${StackBucket.Arn}/*
+      Roles:
+        - Ref: AddItemLambdaRole
+        - Ref: UpdateItemLambdaRole
+
+  ItemsQueuePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt UpdateItemLambda.Arn
+      Principal: sqs.amazonaws.com
+      Action: lambda:InvokeFunction
+      SourceArn: !GetAtt ItemsQueue.Arn
+
+  ItemsQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref ItemsQueue
+      PolicyDocument:
+        Id: !Sub ${AWS::StackName}-items-queue-policy
+        Version: 2012-10-17
+        Statement:
+          - Sid: Allow receive message
+            Effect: Allow
+            Principal:
+              AWS: "*"
+            Action: SQS:ReceiveMessage
+            Resource: !GetAtt ItemsQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt UpdateItemLambda.Arn
+          - Sid: Allow send message
+            Effect: Allow
+            Principal: "*"
+            Action: SQS:SendMessage
+            Resource: !GetAtt ItemsQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn:
+                  - !GetAtt AddItemLambda.Arn
+
+  StackBucket:
+    Type: AWS::S3::Bucket
+
+  ItemsQueue:
+    Type: AWS::SQS::Queue
+
+  BasicParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${AWS::StackName}/ExternalApiConfig/BaseUrl
+      Type: String
+      Value: http://worldclockapi.com
+
+Globals:
+  Function:
+    Runtime: dotnetcore3.1
+    CodeUri: bin/Release/netcoreapp3.1/publish
+    MemorySize: 1536
+    Timeout: 30
+    Tracing: Active
+    Environment:
+      Variables:
+        StackName: !Sub ${AWS::StackName}
+        BucketName: !Ref StackBucket
+        QueueUrl: !Ref ItemsQueue
