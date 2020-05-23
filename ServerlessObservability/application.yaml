@@ -40,32 +40,25 @@ Resources:
       Policies:
         - PolicyName: allowToUseSqs
           PolicyDocument:
-            Version: 2012-10-17
             Statement:
               - Effect: Allow
-                Action:
-                  - sqs:SendMessage
+                Action: sqs:SendMessage
                 Resource: !GetAtt ItemsQueue.Arn
         - PolicyName: allowToUseParameterStore
           PolicyDocument:
-            Version: 2012-10-17
             Statement:
               - Effect: Allow
-                Action:
-                  - ssm:GetParametersByPath
+                Action: ssm:GetParametersByPath
                 Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
         Statement:
           - Effect: Allow
-            Action:
-              - sts:AssumeRole
+            Action: sts:AssumeRole
             Principal:
-              Service:
-                - lambda.amazonaws.com
+              Service: lambda.amazonaws.com
 
   NotifyLambdaRole:
     Type: AWS::IAM::Role
@@ -73,24 +66,19 @@ Resources:
       Policies:
         - PolicyName: allowToUseParameterStore
           PolicyDocument:
-            Version: 2012-10-17
             Statement:
               - Effect: Allow
-                Action:
-                  - ssm:GetParametersByPath
+                Action: ssm:GetParametersByPath
                 Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
         Statement:
           - Effect: Allow
-            Action:
-              - sts:AssumeRole
+            Action: sts:AssumeRole
             Principal:
-              Service:
-                - lambda.amazonaws.com
+              Service: lambda.amazonaws.com
 
   UpdateItemLambdaRole:
     Type: AWS::IAM::Role
@@ -98,7 +86,6 @@ Resources:
       Policies:
         - PolicyName: allowToUseSqs
           PolicyDocument:
-            Version: 2012-10-17
             Statement:
               - Effect: Allow
                 Action:
@@ -108,47 +95,37 @@ Resources:
                 Resource: !GetAtt ItemsQueue.Arn
         - PolicyName: allowToUseParameterStore
           PolicyDocument:
-            Version: 2012-10-17
             Statement:
               - Effect: Allow
-                Action:
-                  - ssm:GetParametersByPath
+                Action: ssm:GetParametersByPath
                 Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}
         - PolicyName: allowToCallLambda
           PolicyDocument:
-            Version: 2012-10-17
             Statement:
               - Effect: Allow
-                Action:
-                  - lambda:InvokeFunction
+                Action: lambda:InvokeFunction
                 Resource: !GetAtt NotifyLambda.Arn
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
         Statement:
           - Effect: Allow
-            Action:
-              - sts:AssumeRole
+            Action: sts:AssumeRole
             Principal:
-              Service:
-                - lambda.amazonaws.com
+              Service: lambda.amazonaws.com
 
   GetObjectsFromStackBucketPolicy:
     Type: AWS::IAM::Policy
     Properties:
       PolicyName: !Sub ${AWS::StackName}-get-objects-from-stack-bucket-policy
       PolicyDocument:
-        Version: 2012-10-17
         Statement:
           - Effect: Allow
-            Action:
-              - s3:ListBucket
+            Action: s3:ListBucket
             Resource: !GetAtt StackBucket.Arn
           - Effect: Allow
-            Action:
-              - s3:GetObject
+            Action: s3:GetObject
             Resource: !Sub ${StackBucket.Arn}/*
       Roles:
         - Ref: UpdateItemLambdaRole
@@ -158,15 +135,12 @@ Resources:
     Properties:
       PolicyName: !Sub ${AWS::StackName}-put-objects-to-stack-bucket-policy
       PolicyDocument:
-        Version: 2012-10-17
         Statement:
           - Effect: Allow
-            Action:
-              - s3:ListBucket
+            Action: s3:ListBucket
             Resource: !GetAtt StackBucket.Arn
           - Effect: Allow
-            Action:
-              - s3:PutObject
+            Action: s3:PutObject
             Resource: !Sub ${StackBucket.Arn}/*
       Roles:
         - Ref: AddItemLambdaRole
@@ -187,12 +161,10 @@ Resources:
         - !Ref ItemsQueue
       PolicyDocument:
         Id: !Sub ${AWS::StackName}-items-queue-policy
-        Version: 2012-10-17
         Statement:
           - Sid: Allow receive message
             Effect: Allow
-            Principal:
-              AWS: "*"
+            Principal: "*"
             Action: SQS:ReceiveMessage
             Resource: !GetAtt ItemsQueue.Arn
             Condition:
