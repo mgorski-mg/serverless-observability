@@ -7,36 +7,28 @@ namespace ServerlessObservability.Configuration
     {
         private static IConfigurationRoot Config => ConfigLazy.Value;
 
-        private static readonly Lazy<IConfigurationRoot> ConfigLazy = new Lazy<IConfigurationRoot>(InitConfig);
+        private static readonly Lazy<IConfigurationRoot> ConfigLazy = new(InitConfig);
 
         private static IConfigurationRoot InitConfig()
         {
-            var stackName = Environment.GetEnvironmentVariable("StackName");
             var configurationBuilder = new ConfigurationBuilder()
-                                      .AddEnvironmentVariables()
-                                      .AddSystemsManager(
-                                           configSource =>
-                                           {
-                                               configSource.Path = $"/{stackName}";
-                                               configSource.ReloadAfter = TimeSpan.FromMinutes(5);
-                                           }
-                                       );
+               .AddEnvironmentVariables();
 
             return configurationBuilder.Build();
         }
 
-        public static ItemsQueueConfig GetSqsConfig() => new ItemsQueueConfig { QueueUrl = Config["QueueUrl"] };
+        public static ItemsQueueConfig GetSqsConfig()
+            => new()
+            {
+                QueueUrl = Config["QueueUrl"]!,
+                QueueV2Url = Config["QueueV2Url"]!
+            };
 
 
-        public static S3Config GetS3Config() => new S3Config { BucketName = Config["BucketName"] };
+        public static S3Config GetS3Config() => new() { BucketName = Config["BucketName"]! };
 
-        public static string GetNotifyLambdaName() => Config["NotifyLambdaName"];
+        public static string GetNotifyLambdaName() => Config["NotifyLambdaName"]!;
 
-        public static ExternalApiConfig GetExternalApiConfig()
-        {
-            var externalApiConfig = new ExternalApiConfig();
-            Config.GetSection("ExternalApiConfig").Bind(externalApiConfig);
-            return externalApiConfig;
-        }
+        public static string GetExternalApiUrl() => Config["ExternalApiUrl"]!;
     }
 }

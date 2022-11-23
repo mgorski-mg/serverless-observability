@@ -1,4 +1,3 @@
-AWSTemplateFormatVersion: 2010-09-09
 Transform: AWS::Serverless-2016-10-31
 
 Resources:
@@ -11,12 +10,16 @@ Resources:
         Variables:
           BucketName: !Ref StackBucket
           QueueUrl: !Ref ItemsQueue
+          QueueV2Url: !Ref ItemsQueueV2
 
   NotifyLambda:
     Type: AWS::Serverless::Function
     Properties:
       Handler: ServerlessObservability::ServerlessObservability.Functions.NotifyLambda::InvokeAsync
       Role: !GetAtt NotifyLambdaRole.Arn
+      Environment:
+        Variables:
+          ExternalApiUrl: http://worldclockapi.com
 
   UpdateItemLambda:
     Type: AWS::Serverless::Function
@@ -34,6 +37,22 @@ Resources:
           NotifyLambdaName: !Ref NotifyLambda
           BucketName: !Ref StackBucket
 
+  UpdateItemLambdaV2:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ServerlessObservability::ServerlessObservability.Functions.UpdateItemLambdaV2::InvokeAsync
+      Role: !GetAtt UpdateItemLambdaRoleV2.Arn
+      Events:
+        SqsEvent:
+          Type: SQS
+          Properties:
+            BatchSize: 1
+            Queue: !GetAtt ItemsQueueV2.Arn
+      Environment:
+        Variables:
+          NotifyLambdaName: !Ref NotifyLambda
+          BucketName: !Ref StackBucket
+
   AddItemLambdaRole:
     Type: AWS::IAM::Role
     Properties:
@@ -43,13 +62,9 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: sqs:SendMessage
-                Resource: !GetAtt ItemsQueue.Arn
-        - PolicyName: allowToUseParameterStore
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Action: ssm:GetParametersByPath
-                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}
+                Resource:
+                  - !GetAtt ItemsQueue.Arn
+                  - !GetAtt ItemsQueueV2.Arn
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
@@ -63,13 +78,6 @@ Resources:
   NotifyLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      Policies:
-        - PolicyName: allowToUseParameterStore
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Action: ssm:GetParametersByPath
-                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
@@ -93,12 +101,35 @@ Resources:
                   - sqs:DeleteMessage
                   - sqs:GetQueueAttributes
                 Resource: !GetAtt ItemsQueue.Arn
-        - PolicyName: allowToUseParameterStore
+        - PolicyName: allowToCallLambda
           PolicyDocument:
             Statement:
               - Effect: Allow
-                Action: ssm:GetParametersByPath
-                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt NotifyLambda.Arn
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: lambda.amazonaws.com
+
+  UpdateItemLambdaRoleV2:
+    Type: AWS::IAM::Role
+    Properties:
+      Policies:
+        - PolicyName: allowToUseSqs
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt ItemsQueueV2.Arn
         - PolicyName: allowToCallLambda
           PolicyDocument:
             Statement:
@@ -129,6 +160,7 @@ Resources:
             Resource: !Sub ${StackBucket.Arn}/*
       Roles:
         - Ref: UpdateItemLambdaRole
+        - Ref: UpdateItemLambdaRoleV2
 
   PutObjectsToStackBucketPolicy:
     Type: AWS::IAM::Policy
@@ -145,40 +177,7 @@ Resources:
       Roles:
         - Ref: AddItemLambdaRole
         - Ref: UpdateItemLambdaRole
-
-  ItemsQueuePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !GetAtt UpdateItemLambda.Arn
-      Principal: sqs.amazonaws.com
-      Action: lambda:InvokeFunction
-      SourceArn: !GetAtt ItemsQueue.Arn
-
-  ItemsQueuePolicy:
-    Type: AWS::SQS::QueuePolicy
-    Properties:
-      Queues:
-        - !Ref ItemsQueue
-      PolicyDocument:
-        Id: !Sub ${AWS::StackName}-items-queue-policy
-        Statement:
-          - Sid: Allow receive message
-            Effect: Allow
-            Principal: "*"
-            Action: SQS:ReceiveMessage
-            Resource: !GetAtt ItemsQueue.Arn
-            Condition:
-              ArnEquals:
-                aws:SourceArn: !GetAtt UpdateItemLambda.Arn
-          - Sid: Allow send message
-            Effect: Allow
-            Principal: "*"
-            Action: SQS:SendMessage
-            Resource: !GetAtt ItemsQueue.Arn
-            Condition:
-              ArnEquals:
-                aws:SourceArn:
-                  - !GetAtt AddItemLambda.Arn
+        - Ref: UpdateItemLambdaRoleV2
 
   StackBucket:
     Type: AWS::S3::Bucket
@@ -186,20 +185,14 @@ Resources:
   ItemsQueue:
     Type: AWS::SQS::Queue
 
-  BasicParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /${AWS::StackName}/ExternalApiConfig/BaseUrl
-      Type: String
-      Value: http://worldclockapi.com
+  ItemsQueueV2:
+    Type: AWS::SQS::Queue
 
 Globals:
   Function:
-    Runtime: dotnetcore3.1
-    CodeUri: bin/Release/netcoreapp3.1/publish
+    Runtime: dotnet6
     MemorySize: 1536
     Timeout: 30
     Tracing: Active
-    Environment:
-      Variables:
-        StackName: !Sub ${AWS::StackName}
+    Architectures:
+      - arm64

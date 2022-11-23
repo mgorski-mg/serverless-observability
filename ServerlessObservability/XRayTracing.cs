@@ -13,7 +13,7 @@ namespace ServerlessObservability
     {
         public static string TraceId => AWSXRayRecorder.Instance.TraceContext.GetEntity().TraceId;
 
-        private Segment _lambdaSegment;
+        private Segment? _lambdaSegment;
 
         private readonly decimal _startTime;
 

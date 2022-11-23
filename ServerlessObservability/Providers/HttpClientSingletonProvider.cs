@@ -9,12 +9,12 @@ namespace ServerlessObservability.Providers
     {
         public static HttpClient GetHttpClient() => HttpClientLazy.Value;
 
-        private static readonly Lazy<HttpClient> HttpClientLazy = new Lazy<HttpClient>(
+        private static readonly Lazy<HttpClient> HttpClientLazy = new(
             () =>
             {
                 var clientHandler = new HttpClientHandler();
                 var httpClientXRayTracingHandler = new HttpClientXRayTracingHandler(clientHandler);
-                return new HttpClient(httpClientXRayTracingHandler) { BaseAddress = new Uri(ConfigurationReader.GetExternalApiConfig().BaseUrl) };
+                return new HttpClient(httpClientXRayTracingHandler) { BaseAddress = new Uri(ConfigurationReader.GetExternalApiUrl()) };
             }
         );
     }

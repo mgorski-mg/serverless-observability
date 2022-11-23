@@ -22,8 +22,10 @@ namespace ServerlessObservability.Functions
             Logger.Log("New item saved", "INFO");
 
             var sqsClient = AwsClientsSingletonsProvider.GetSqsClient();
-            var queueService = new QueueService(sqsClient, ConfigurationReader.GetSqsConfig());
-            await queueService.AddMessageAsync(new ItemMessage(newItem.Id));
+            var queueConfig = ConfigurationReader.GetSqsConfig();
+            var queueService = new QueueService(sqsClient);
+            await queueService.AddMessageAsync(new ItemMessage(newItem.Id), queueConfig.QueueUrl);
+            await queueService.AddMessageAsync(new ItemMessage(newItem.Id), queueConfig.QueueV2Url);
             Logger.Log("New item added event sent", "INFO");
         }
     }

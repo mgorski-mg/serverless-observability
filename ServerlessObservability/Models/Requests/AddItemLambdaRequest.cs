@@ -4,15 +4,13 @@ namespace ServerlessObservability.Models.Requests
 {
     public class AddItemLambdaRequest
     {
-        public string Message { get; set; }
-
-        public AddItemLambdaRequest() {}
+        public string Message { get; }
 
         public AddItemLambdaRequest(string message)
         {
             Message = message;
         }
 
-        public NewItem ToNewItem() => new NewItem(Guid.NewGuid(), Message);
+        public NewItem ToNewItem() => new(Guid.NewGuid(), Message);
     }
 }

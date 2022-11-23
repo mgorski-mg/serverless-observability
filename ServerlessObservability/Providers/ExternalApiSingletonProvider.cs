@@ -8,7 +8,7 @@ namespace ServerlessObservability.Providers
     {
         public static IExternalApi GetExternalApi() => ExternalApiApiLazy.Value;
 
-        private static readonly Lazy<IExternalApi> ExternalApiApiLazy = new Lazy<IExternalApi>(
+        private static readonly Lazy<IExternalApi> ExternalApiApiLazy = new(
             () =>
             {
                 var httpClient = HttpClientSingletonProvider.GetHttpClient();

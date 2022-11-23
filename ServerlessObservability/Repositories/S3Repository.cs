@@ -50,9 +50,9 @@ namespace ServerlessObservability.Repositories
             var rawS3Response = await _amazonS3Client.GetObjectAsync(getObjectRequest);
             await using var itemStream = rawS3Response.ResponseStream;
             var streamReader = new StreamReader(itemStream);
-            var item = JsonSerializer.Deserialize<NewItem>(streamReader.ReadToEnd());
+            var item = JsonSerializer.Deserialize<NewItem>(await streamReader.ReadToEndAsync());
 
-            return item;
+            return item!;
         }
     }
 }

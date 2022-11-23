@@ -13,7 +13,7 @@ namespace ServerlessObservability.Services
             _lambdaContext = lambdaContext;
         }
 
-        public void Log(string logMessage, string logLevel, Exception exception = null)
+        public void Log(string logMessage, string logLevel, Exception? exception = null)
         {
             var logModel = new LogModel
             {

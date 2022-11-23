@@ -36,7 +36,7 @@ namespace ServerlessObservability.Models.Logs
         public string AwsRequestId { get; set; }
 
         [JsonPropertyName("exception")]
-        public string Exception { get; set; }
+        public string? Exception { get; set; }
 
         public string ToJson() => JsonSerializer.Serialize(this);
     }

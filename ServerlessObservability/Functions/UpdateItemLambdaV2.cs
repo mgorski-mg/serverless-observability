@@ -3,7 +3,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Amazon.Lambda;
-using Amazon.Lambda.Core;
 using Amazon.Lambda.Model;
 using Amazon.Lambda.SQSEvents;
 using ServerlessObservability.Configuration;
@@ -15,11 +14,11 @@ using ServerlessObservability.Repositories;
 
 namespace ServerlessObservability.Functions
 {
-    public class UpdateItemLambda : LoggingUnhandledExceptionNoResultLambda<SQSEvent>
+    public class UpdateItemLambdaV2 : LoggingUnhandledExceptionNoResultLambda<SQSEvent>
     {
         protected override async Task HandleAsync(SQSEvent sqsEvent)
         {
-            var itemMessage = ExtractItemMessage(sqsEvent, LambdaContext, XRayTracing);
+            var itemMessage = ExtractItemMessage(sqsEvent);
             var s3Repository = GetS3Repository();
 
             var item = await s3Repository.GetNewItemAsync(itemMessage.ItemId);
@@ -34,16 +33,14 @@ namespace ServerlessObservability.Functions
                                                    {
                                                        InvocationType = InvocationType.Event,
                                                        FunctionName = ConfigurationReader.GetNotifyLambdaName(),
-                                                       Payload = JsonSerializer.Serialize(new AddItemLambdaRequest("test connection"))
+                                                       Payload = JsonSerializer.Serialize(new AddItemLambdaRequest("test connection V2"))
                                                    }
                                                );
         }
 
-        private static ItemMessage ExtractItemMessage(SQSEvent sqsEvent, ILambdaContext lambdaContext, XRayTracing xRayTracing)
+        private static ItemMessage ExtractItemMessage(SQSEvent sqsEvent)
         {
             var sqsMessage = sqsEvent.Records.Single();
-
-            xRayTracing.RewriteTraceContext(sqsMessage, lambdaContext);
 
             var itemMessage = JsonSerializer.Deserialize<ItemMessage>(sqsMessage.Body);
             return itemMessage!;

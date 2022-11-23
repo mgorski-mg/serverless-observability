@@ -9,8 +9,8 @@ namespace ServerlessObservability.Functions
     {
         protected override async Task HandleAsync(AddItemLambdaRequest lambdaRequest)
         {
-            await ExternalApiSingletonProvider.GetExternalApi().GetTimeAsync();
-            Logger.Log("Notified", "INFO");
+            var time = await ExternalApiSingletonProvider.GetExternalApi().GetTimeAsync();
+            Logger.Log($"Notified about {lambdaRequest.Message} in {time.CurrentDateTime}", "INFO");
         }
     }
 }

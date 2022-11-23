@@ -6,8 +6,6 @@ namespace ServerlessObservability.Models
     {
         public Guid ItemId { get; set; }
 
-        public ItemMessage() {}
-
         public ItemMessage(Guid itemId)
         {
             ItemId = itemId;

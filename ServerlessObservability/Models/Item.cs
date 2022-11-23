@@ -10,9 +10,7 @@ namespace ServerlessObservability.Models
 
         public DateTime CreateTime { get; set; } = DateTime.UtcNow;
 
-        public Item() {}
-
-        public Item(Guid id, ItemType itemType, string message)
+        protected Item(Guid id, ItemType itemType, string message)
         {
             Id = id;
             Type = itemType;
